@@ -1,0 +1,184 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Central OAM sink, disk alert topic, and dashboard. Deploy in each monitored region.
+
+Parameters:
+  OrganizationId:
+    Type: String
+    Description: AWS Organization whose member accounts may share disk metrics.
+    AllowedPattern: '^o-[a-z0-9]{10,32}$'
+
+  AcquiredAccountIds:
+    Type: String
+    Default: ''
+    Description: Optional comma-separated account IDs outside the Organization, without spaces.
+    AllowedPattern: '^$|^[0-9]{12}(,[0-9]{12})*$'
+
+  NotificationEmail:
+    Type: String
+    Description: Email recipient for disk alarms and coverage failures. Confirm the SNS subscription.
+
+  CentralControllerRoleArn:
+    Type: String
+    Description: Existing Ansible controller role allowed to publish coverage failure reports.
+    AllowedPattern: '^arn:[a-z0-9-]+:iam::[0-9]{12}:role/.+$'
+
+Conditions:
+  HasAcquiredAccounts: !Not [!Equals [!Ref AcquiredAccountIds, '']]
+
+Resources:
+  CentralObservabilitySink:
+    Type: AWS::Oam::Sink
+    Properties:
+      Name: CentralDiskObservabilitySink
+      Policy:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AllowOrganizationMetrics
+            Effect: Allow
+            Principal: '*'
+            Action:
+              - oam:CreateLink
+              - oam:UpdateLink
+            Resource: '*'
+            Condition:
+              StringEquals:
+                aws:PrincipalOrgID: !Ref OrganizationId
+              ForAllValues:StringEquals:
+                oam:ResourceTypes:
+                  - AWS::CloudWatch::Metric
+          - !If
+            - HasAcquiredAccounts
+            - Sid: AllowAcquiredAccountMetrics
+              Effect: Allow
+              Principal:
+                AWS: !Split [',', !Ref AcquiredAccountIds]
+              Action:
+                - oam:CreateLink
+                - oam:UpdateLink
+              Resource: '*'
+              Condition:
+                ForAllValues:StringEquals:
+                  oam:ResourceTypes:
+                    - AWS::CloudWatch::Metric
+            - !Ref AWS::NoValue
+
+  CentralDiskAlertsTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: enterprise-disk-alerts
+      Subscription:
+        - Protocol: email
+          Endpoint: !Ref NotificationEmail
+
+  CentralDiskAlertsTopicPolicy:
+    Type: AWS::SNS::TopicPolicy
+    Properties:
+      Topics:
+        - !Ref CentralDiskAlertsTopic
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          # CloudWatch publishes as a service, so restrict the source of the alarm.
+          - Sid: AllowOrganizationDiskAlarms
+            Effect: Allow
+            Principal:
+              Service: cloudwatch.amazonaws.com
+            Action: sns:Publish
+            Resource: !Ref CentralDiskAlertsTopic
+            Condition:
+              StringEquals:
+                aws:SourceOrgID: !Ref OrganizationId
+              ArnLike:
+                aws:SourceArn: !Sub 'arn:${AWS::Partition}:cloudwatch:${AWS::Region}:*:alarm:Disk-*'
+          - !If
+            - HasAcquiredAccounts
+            - Sid: AllowAcquiredAccountDiskAlarms
+              Effect: Allow
+              Principal:
+                Service: cloudwatch.amazonaws.com
+              Action: sns:Publish
+              Resource: !Ref CentralDiskAlertsTopic
+              Condition:
+                StringEquals:
+                  aws:SourceAccount: !Split [',', !Ref AcquiredAccountIds]
+                ArnLike:
+                  aws:SourceArn: !Sub 'arn:${AWS::Partition}:cloudwatch:${AWS::Region}:*:alarm:Disk-*'
+            - !Ref AWS::NoValue
+          - Sid: AllowControllerCoverageReports
+            Effect: Allow
+            Principal:
+              AWS: !Ref CentralControllerRoleArn
+            Action: sns:Publish
+            Resource: !Ref CentralDiskAlertsTopic
+
+  # Dashboard names are global within an account; each region gets its own view.
+  CentralDiskDashboard:
+    Type: AWS::CloudWatch::Dashboard
+    Properties:
+      DashboardName: !Sub 'Enterprise-Disk-Capacity-${AWS::Region}'
+      DashboardBody: !Sub |
+        {
+          "widgets": [
+            {
+              "type": "metric",
+              "x": 0,
+              "y": 0,
+              "width": 24,
+              "height": 8,
+              "properties": {
+                "metrics": [
+                  [{"expression": "SEARCH('{CWAgent,InstanceId,path} MetricName=\"disk_used_percent\"', 'Average', 60)", "id": "e1"}]
+                ],
+                "view": "timeSeries",
+                "stacked": false,
+                "region": "${AWS::Region}",
+                "period": 60,
+                "title": "Linux disk used (%) - ${AWS::Region}",
+                "yAxis": {"left": {"min": 0, "max": 100}},
+                "annotations": {
+                  "horizontal": [
+                    {"color": "#ff7f0e", "label": "Warning", "value": 80},
+                    {"color": "#d62728", "label": "Critical", "value": 90}
+                  ]
+                }
+              }
+            },
+            {
+              "type": "metric",
+              "x": 0,
+              "y": 8,
+              "width": 24,
+              "height": 8,
+              "properties": {
+                "metrics": [
+                  [{"expression": "SEARCH('{CWAgent,InstanceId,instance,objectname} MetricName=\"disk_free_percent\"', 'Average', 60)", "id": "e1"}]
+                ],
+                "view": "timeSeries",
+                "stacked": false,
+                "region": "${AWS::Region}",
+                "period": 60,
+                "title": "Windows disk free (%) - ${AWS::Region}",
+                "yAxis": {"left": {"min": 0, "max": 100}},
+                "annotations": {
+                  "horizontal": [
+                    {"color": "#ff7f0e", "label": "Warning", "value": 20},
+                    {"color": "#d62728", "label": "Critical", "value": 10}
+                  ]
+                }
+              }
+            }
+          ]
+        }
+
+Outputs:
+  CentralSinkArn:
+    Description: Pass to the member regional template deployed in this same region.
+    Value: !GetAtt CentralObservabilitySink.Arn
+
+  CentralAlertTopicArn:
+    Description: Use for alarms and coverage reports in this region.
+    Value: !Ref CentralDiskAlertsTopic
+
+  DashboardName:
+    Description: Central cross-account disk dashboard for this region.
+    Value: !Ref CentralDiskDashboard

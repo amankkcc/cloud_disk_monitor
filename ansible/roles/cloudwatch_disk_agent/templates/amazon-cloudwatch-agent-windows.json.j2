@@ -1,0 +1,19 @@
+{
+  "agent": {
+    "metrics_collection_interval": {{ cw_metric_collection_interval_seconds }}
+  },
+  "metrics": {
+    "namespace": {{ cw_namespace | to_json }},
+    "append_dimensions": {
+      "InstanceId": "${aws:InstanceId}"
+    },
+    "metrics_collected": {
+      "LogicalDisk": {
+        "measurement": [
+          {"name": "% Free Space", "rename": {{ windows_disk_metric_name | to_json }}, "unit": "Percent"}
+        ],
+        "resources": ["*"]
+      }
+    }
+  }
+}

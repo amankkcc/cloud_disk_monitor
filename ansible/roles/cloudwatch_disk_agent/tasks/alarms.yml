@@ -1,0 +1,136 @@
+---
+# A short filesystem hash keeps names valid for paths containing slashes or spaces.
+
+- name: Create linux warning disk alarms
+  amazon.aws.cloudwatch_metric_alarm:
+    state: present
+    profile: "{{ target_profile }}"
+    region: "{{ target_region }}"
+    name: "Disk-Warning-{{ inventory_hostname }}-{{ (item | hash('sha1'))[:12] }}"
+    namespace: "{{ cw_namespace }}"
+    metric_name: "{{ linux_disk_metric_name }}"
+    statistic: Average
+    comparison: GreaterThanOrEqualToThreshold
+    threshold: "{{ disk_warning_threshold }}"
+    period: "{{ alarm_period_seconds }}"
+    evaluation_periods: "{{ alarm_evaluation_periods }}"
+    datapoints_to_alarm: "{{ alarm_datapoints_to_alarm }}"
+    dimensions:
+      InstanceId: "{{ inventory_hostname }}"
+      path: "{{ item }}"
+    description: "Warning: {{ item }} on {{ inventory_hostname }} is at or above {{ disk_warning_threshold }}% used."
+    alarm_actions:
+      - "{{ alarm_sns_topic_arn }}"
+    ok_actions:
+      - "{{ alarm_sns_topic_arn }}"
+    treat_missing_data: missing
+  loop: "{{ monitoring_filesystems }}"
+  when: monitoring_platform == 'linux'
+  register: linux_warning_alarms
+
+- name: Create linux critical disk alarms
+  amazon.aws.cloudwatch_metric_alarm:
+    state: present
+    profile: "{{ target_profile }}"
+    region: "{{ target_region }}"
+    name: "Disk-Critical-{{ inventory_hostname }}-{{ (item | hash('sha1'))[:12] }}"
+    namespace: "{{ cw_namespace }}"
+    metric_name: "{{ linux_disk_metric_name }}"
+    statistic: Average
+    comparison: GreaterThanOrEqualToThreshold
+    threshold: "{{ disk_critical_threshold }}"
+    period: "{{ alarm_period_seconds }}"
+    evaluation_periods: "{{ alarm_evaluation_periods }}"
+    datapoints_to_alarm: "{{ alarm_datapoints_to_alarm }}"
+    dimensions:
+      InstanceId: "{{ inventory_hostname }}"
+      path: "{{ item }}"
+    description: "Critical: {{ item }} on {{ inventory_hostname }} is at or above {{ disk_critical_threshold }}% used."
+    alarm_actions:
+      - "{{ alarm_sns_topic_arn }}"
+    ok_actions:
+      - "{{ alarm_sns_topic_arn }}"
+    treat_missing_data: missing
+  loop: "{{ monitoring_filesystems }}"
+  when: monitoring_platform == 'linux'
+  register: linux_critical_alarms
+
+- name: Create windows warning disk alarms
+  amazon.aws.cloudwatch_metric_alarm:
+    state: present
+    profile: "{{ target_profile }}"
+    region: "{{ target_region }}"
+    name: "Disk-Warning-{{ inventory_hostname }}-{{ (item | hash('sha1'))[:12] }}"
+    namespace: "{{ cw_namespace }}"
+    metric_name: "{{ windows_disk_metric_name }}"
+    statistic: Average
+    comparison: LessThanOrEqualToThreshold
+    threshold: "{{ 100 - (disk_warning_threshold | int) }}"
+    period: "{{ alarm_period_seconds }}"
+    evaluation_periods: "{{ alarm_evaluation_periods }}"
+    datapoints_to_alarm: "{{ alarm_datapoints_to_alarm }}"
+    dimensions:
+      InstanceId: "{{ inventory_hostname }}"
+      instance: "{{ item }}"
+      objectname: LogicalDisk
+    description: "Warning: {{ item }} on {{ inventory_hostname }} is at or above {{ disk_warning_threshold }}% used."
+    alarm_actions:
+      - "{{ alarm_sns_topic_arn }}"
+    ok_actions:
+      - "{{ alarm_sns_topic_arn }}"
+    treat_missing_data: missing
+  loop: "{{ monitoring_filesystems }}"
+  when: monitoring_platform == 'windows'
+  register: windows_warning_alarms
+
+- name: Create windows critical disk alarms
+  amazon.aws.cloudwatch_metric_alarm:
+    state: present
+    profile: "{{ target_profile }}"
+    region: "{{ target_region }}"
+    name: "Disk-Critical-{{ inventory_hostname }}-{{ (item | hash('sha1'))[:12] }}"
+    namespace: "{{ cw_namespace }}"
+    metric_name: "{{ windows_disk_metric_name }}"
+    statistic: Average
+    comparison: LessThanOrEqualToThreshold
+    threshold: "{{ 100 - (disk_critical_threshold | int) }}"
+    period: "{{ alarm_period_seconds }}"
+    evaluation_periods: "{{ alarm_evaluation_periods }}"
+    datapoints_to_alarm: "{{ alarm_datapoints_to_alarm }}"
+    dimensions:
+      InstanceId: "{{ inventory_hostname }}"
+      instance: "{{ item }}"
+      objectname: LogicalDisk
+    description: "Critical: {{ item }} on {{ inventory_hostname }} is at or above {{ disk_critical_threshold }}% used."
+    alarm_actions:
+      - "{{ alarm_sns_topic_arn }}"
+    ok_actions:
+      - "{{ alarm_sns_topic_arn }}"
+    treat_missing_data: missing
+  loop: "{{ monitoring_filesystems }}"
+  when: monitoring_platform == 'windows'
+  register: windows_critical_alarms
+
+# The alarm module does not restore disabled actions when its other settings match.
+- name: Restore notification actions on disabled managed alarms
+  ansible.builtin.command:
+    argv:
+      - aws
+      - cloudwatch
+      - enable-alarm-actions
+      - --profile
+      - "{{ target_profile }}"
+      - --region
+      - "{{ target_region }}"
+      - --alarm-names
+      - "{{ item.name }}"
+  loop: >-
+    {{ ((linux_warning_alarms.results | default([]))
+        + (linux_critical_alarms.results | default([]))
+        + (windows_warning_alarms.results | default([]))
+        + (windows_critical_alarms.results | default([])))
+       | selectattr('actions_enabled', 'defined')
+       | selectattr('actions_enabled', 'equalto', false) | list }}
+  loop_control:
+    label: "{{ item.name }}"
+  changed_when: true

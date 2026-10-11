@@ -1,0 +1,121 @@
+<?xml version='1.0' encoding='utf-8'?>
+<mxfile host="app.diagrams.net" type="device" compressed="false">
+  <diagram id="high-level-architecture" name="High-level architecture">
+    <mxGraphModel dx="1600" dy="1000" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1700" pageHeight="1290" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="Title" value="AWS disk monitoring — high-level architecture" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;fontFamily=Helvetica;fontSize=34;fontStyle=1;fontColor=#0f172a;" vertex="1" parent="1">
+          <mxGeometry x="80" y="30" width="1540" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="Subtitle" value="One regional view. Repeat the workload account block as the fleet grows." style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;fontFamily=Helvetica;fontSize=20;fontStyle=0;fontColor=#475569;" vertex="1" parent="1">
+          <mxGeometry x="80" y="95" width="1540" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="CENTRAL" value="CENTRAL MONITORING ACCOUNT" style="swimlane;html=1;rounded=1;arcSize=8;startSize=48;horizontal=1;collapsible=0;container=1;recursiveResize=0;whiteSpace=wrap;fontFamily=Helvetica;fontSize=20;fontStyle=1;align=left;spacingLeft=20;strokeWidth=2;strokeColor=#94a3b8;fillColor=#f1f5f9;swimlaneFillColor=#ffffff;separatorColor=none;" vertex="1" parent="1">
+          <mxGeometry x="50" y="180" width="680" height="750" as="geometry" />
+        </mxCell>
+        <mxCell id="HUB" value="Regional monitoring hub" style="swimlane;html=1;rounded=1;arcSize=8;startSize=48;horizontal=1;collapsible=0;container=1;recursiveResize=0;whiteSpace=wrap;fontFamily=Helvetica;fontSize=20;fontStyle=1;align=left;spacingLeft=20;strokeWidth=2;strokeColor=#94a3b8;fillColor=#f1f5f9;swimlaneFillColor=#ffffff;separatorColor=none;startSize=44;fontSize=18;dashed=1;fillColor=#f8fafc;" vertex="1" parent="CENTRAL">
+          <mxGeometry x="50" y="360" width="580" height="350" as="geometry" />
+        </mxCell>
+        <mxCell id="WORKLOAD" value="WORKLOAD ACCOUNTS A … N — matching region" style="swimlane;html=1;rounded=1;arcSize=8;startSize=48;horizontal=1;collapsible=0;container=1;recursiveResize=0;whiteSpace=wrap;fontFamily=Helvetica;fontSize=20;fontStyle=1;align=left;spacingLeft=20;strokeWidth=2;strokeColor=#94a3b8;fillColor=#f1f5f9;swimlaneFillColor=#ffffff;separatorColor=none;" vertex="1" parent="1">
+          <mxGeometry x="910" y="180" width="670" height="750" as="geometry" />
+        </mxCell>
+        <mxCell id="Controller" value="&lt;b&gt;Ansible controller&lt;/b&gt;&lt;br/&gt;Discover, configure and audit" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#e8f1ff;strokeColor=#2563eb;strokeWidth=2;fontColor=#0f172a;fontFamily=Helvetica;fontSize=19;align=center;verticalAlign=middle;spacing=12;" vertex="1" parent="CENTRAL">
+          <mxGeometry x="60" y="100" width="340" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="Dashboard" value="&lt;b&gt;Central CloudWatch dashboard&lt;/b&gt;&lt;br/&gt;OAM cross-account visibility" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#ecfdf5;strokeColor=#059669;strokeWidth=2;fontColor=#0f172a;fontFamily=Helvetica;fontSize=19;align=center;verticalAlign=middle;spacing=12;" vertex="1" parent="HUB">
+          <mxGeometry x="40" y="70" width="300" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="SNS" value="&lt;b&gt;SNS notifications&lt;/b&gt;&lt;br/&gt;Disk alarms + coverage gaps" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#fff7ed;strokeColor=#ea580c;strokeWidth=2;fontColor=#0f172a;fontFamily=Helvetica;fontSize=19;align=center;verticalAlign=middle;spacing=12;" vertex="1" parent="HUB">
+          <mxGeometry x="40" y="220" width="300" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="VM" value="&lt;b&gt;EC2 fleet&lt;/b&gt;&lt;br/&gt;SSM + CloudWatch Agent" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#ecfdf5;strokeColor=#059669;strokeWidth=2;fontColor=#0f172a;fontFamily=Helvetica;fontSize=19;align=center;verticalAlign=middle;spacing=12;" vertex="1" parent="WORKLOAD">
+          <mxGeometry x="80" y="100" width="470" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="CloudWatch" value="&lt;b&gt;Workload CloudWatch&lt;/b&gt;&lt;br/&gt;Disk metrics + warning/critical alarms" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#ecfdf5;strokeColor=#059669;strokeWidth=2;fontColor=#0f172a;fontFamily=Helvetica;fontSize=19;align=center;verticalAlign=middle;spacing=12;" vertex="1" parent="WORKLOAD">
+          <mxGeometry x="80" y="360" width="470" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="Link" value="&lt;b&gt;OAM link&lt;/b&gt;&lt;br/&gt;Share CWAgent metric visibility" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#ecfdf5;strokeColor=#059669;strokeWidth=2;fontColor=#0f172a;fontFamily=Helvetica;fontSize=19;align=center;verticalAlign=middle;spacing=12;" vertex="1" parent="WORKLOAD">
+          <mxGeometry x="80" y="590" width="470" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="Team" value="&lt;b&gt;Operations team&lt;/b&gt;&lt;br/&gt;Confirmed email subscription" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#fff7ed;strokeColor=#ea580c;strokeWidth=2;fontColor=#0f172a;fontFamily=Helvetica;fontSize=19;align=center;verticalAlign=middle;spacing=12;" vertex="1" parent="1">
+          <mxGeometry x="140" y="1040" width="300" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="e_Controller_VM" value="Assume member role&lt;br/&gt;Connect through SSM" style="edgeStyle=segmentEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#2563eb;strokeWidth=2;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;endArrow=block;endFill=1;startArrow=none;startFill=1;fontFamily=Helvetica;fontSize=16;fontColor=#2563eb;labelBackgroundColor=#ffffff;labelBorderColor=none;labelWidth=310;whiteSpace=wrap;spacing=4;jumpStyle=arc;jumpSize=8;" edge="1" parent="1" source="Controller" target="VM">
+          <mxGeometry x="0" y="0" relative="1" as="geometry">
+            <mxPoint x="0" y="-5" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_VM_CloudWatch" value="Disk metrics&lt;br/&gt;every 60 seconds" style="edgeStyle=segmentEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#059669;strokeWidth=2;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;endArrow=block;endFill=1;startArrow=none;startFill=1;fontFamily=Helvetica;fontSize=16;fontColor=#059669;labelBackgroundColor=#ffffff;labelBorderColor=none;labelWidth=250;whiteSpace=wrap;spacing=4;jumpStyle=arc;jumpSize=8;" edge="1" parent="1" source="VM" target="CloudWatch">
+          <mxGeometry x="0" y="0" relative="1" as="geometry">
+            <mxPoint x="0" y="5" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_CloudWatch_Link" value="" style="edgeStyle=segmentEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#7c3aed;strokeWidth=2;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;endArrow=none;endFill=1;startArrow=none;startFill=1;fontFamily=Helvetica;fontSize=16;fontColor=#7c3aed;labelBackgroundColor=#ffffff;labelBorderColor=none;labelWidth=210;whiteSpace=wrap;spacing=4;jumpStyle=arc;jumpSize=8;dashed=1;dashPattern=5 4;" edge="1" parent="1" source="CloudWatch" target="Link">
+          <mxGeometry x="0" y="0" relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_Link_Dashboard" value="Same-region OAM&lt;br/&gt;metric visibility" style="edgeStyle=segmentEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#7c3aed;strokeWidth=2;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;endArrow=block;endFill=1;startArrow=none;startFill=1;fontFamily=Helvetica;fontSize=16;fontColor=#7c3aed;labelBackgroundColor=#ffffff;labelBorderColor=none;labelWidth=250;whiteSpace=wrap;spacing=4;jumpStyle=arc;jumpSize=8;dashed=1;dashPattern=5 4;" edge="1" parent="1" source="Link" target="Dashboard">
+          <mxGeometry x="0" y="0" relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="860" y="810" />
+              <mxPoint x="860" y="660" />
+            </Array>
+            <mxPoint x="-110" y="0" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_CloudWatch_SNS" value="Alarm and recovery&lt;br/&gt;notifications" style="edgeStyle=segmentEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#ea580c;strokeWidth=2;exitX=0;exitY=0.666667;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;endArrow=block;endFill=1;startArrow=none;startFill=1;fontFamily=Helvetica;fontSize=16;fontColor=#ea580c;labelBackgroundColor=#ffffff;labelBorderColor=none;labelWidth=270;whiteSpace=wrap;spacing=4;jumpStyle=arc;jumpSize=8;" edge="1" parent="1" source="CloudWatch" target="SNS">
+          <mxGeometry x="0" y="0" relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="820" y="620" />
+              <mxPoint x="820" y="810" />
+            </Array>
+            <mxPoint x="-180" y="0" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_Controller_CloudWatch" value="Coverage audit&lt;br/&gt;Read AWS APIs" style="edgeStyle=segmentEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#64748b;strokeWidth=2;exitX=1;exitY=0.8;exitDx=0;exitDy=0;entryX=0;entryY=0.25;entryDx=0;entryDy=0;endArrow=block;endFill=1;startArrow=none;startFill=1;fontFamily=Helvetica;fontSize=16;fontColor=#64748b;labelBackgroundColor=#ffffff;labelBorderColor=none;labelWidth=190;whiteSpace=wrap;spacing=4;jumpStyle=arc;jumpSize=8;dashed=1;dashPattern=5 4;" edge="1" parent="1" source="Controller" target="CloudWatch">
+          <mxGeometry x="0" y="0" relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="780" y="360" />
+              <mxPoint x="780" y="570" />
+            </Array>
+            <mxPoint x="0" y="55" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_Controller_SNS" value="Coverage changes" style="edgeStyle=segmentEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#ea580c;strokeWidth=2;exitX=1;exitY=0.7;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;endArrow=block;endFill=1;startArrow=none;startFill=1;fontFamily=Helvetica;fontSize=16;fontColor=#ea580c;labelBackgroundColor=#ffffff;labelBorderColor=none;labelWidth=200;whiteSpace=wrap;spacing=4;jumpStyle=arc;jumpSize=8;" edge="1" parent="1" source="Controller" target="SNS">
+          <mxGeometry x="0" y="0" relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="480" y="350" />
+              <mxPoint x="480" y="725" />
+              <mxPoint x="290" y="725" />
+            </Array>
+            <mxPoint x="0" y="-155" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_SNS_Team" value="" style="edgeStyle=segmentEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#ea580c;strokeWidth=2;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;endArrow=block;endFill=1;startArrow=none;startFill=1;fontFamily=Helvetica;fontSize=16;fontColor=#ea580c;labelBackgroundColor=#ffffff;labelBorderColor=none;labelWidth=210;whiteSpace=wrap;spacing=4;jumpStyle=arc;jumpSize=8;" edge="1" parent="1" source="SNS" target="Team">
+          <mxGeometry x="0" y="0" relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ScopeNote" value="Agents and capacity alarms operate continuously. Enrollment and coverage auditing use the controller." style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;fontFamily=Helvetica;fontSize=17;fontStyle=0;fontColor=#475569;" vertex="1" parent="1">
+          <mxGeometry x="80" y="1160" width="1540" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="Legend_0" value="" style="rounded=1;fillColor=#e8f1ff;strokeColor=#2563eb;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="80.0" y="1228" width="24" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="LegendText_0" value="Management / access" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;fontFamily=Helvetica;fontSize=17;fontStyle=0;fontColor=#475569;" vertex="1" parent="1">
+          <mxGeometry x="118.0" y="1220" width="310" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="Legend_1" value="" style="rounded=1;fillColor=#ecfdf5;strokeColor=#059669;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="593.3333333333334" y="1228" width="24" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="LegendText_1" value="Metrics / visibility" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;fontFamily=Helvetica;fontSize=17;fontStyle=0;fontColor=#475569;" vertex="1" parent="1">
+          <mxGeometry x="631.3333333333334" y="1220" width="310" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="Legend_2" value="" style="rounded=1;fillColor=#fff7ed;strokeColor=#ea580c;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="1106.6666666666667" y="1228" width="24" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="LegendText_2" value="Alerts / operations" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;fontFamily=Helvetica;fontSize=17;fontStyle=0;fontColor=#475569;" vertex="1" parent="1">
+          <mxGeometry x="1144.6666666666667" y="1220" width="310" height="40" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

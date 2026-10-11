@@ -1,0 +1,16 @@
+---
+# The runner supplies one assumed-role profile and region for each invocation.
+plugin: amazon.aws.aws_ec2
+regions:
+  - us-east-1
+filters:
+  instance-state-name: running
+hostnames:
+  - instance-id
+compose:
+  ansible_host: instance_id
+  ansible_connection: "'amazon.aws.aws_ssm'"
+  ansible_aws_ssm_region: placement.region
+groups:
+  linux_instances: "(platform | default('', true)) != 'windows'"
+  windows_instances: "(platform | default('', true)) == 'windows'"

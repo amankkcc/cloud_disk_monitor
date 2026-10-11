@@ -1,0 +1,132 @@
+---
+- name: Check that the Linux distribution and architecture are supported
+  ansible.builtin.assert:
+    that:
+      - ansible_facts.system == 'Linux'
+      - ansible_facts.distribution in cw_linux_distributions
+      - ansible_facts.architecture in cw_linux_architectures
+    fail_msg: >-
+      Unsupported host {{ ansible_facts.distribution }} / {{ ansible_facts.architecture }}.
+      Supported distributions are Amazon Linux, RHEL, Ubuntu and Debian on x86_64 or aarch64.
+
+- name: Check whether the Linux agent is already installed
+  ansible.builtin.stat:
+    path: "{{ cw_linux_ctl_path }}"
+  register: cw_linux_installed
+
+# Regular deployments preserve the installed agent version.
+- name: Install a verified Linux agent when absent
+  when:
+    - not cw_linux_installed.stat.exists
+    - not ansible_check_mode
+  vars:
+    package_extension: "{{ 'deb' if ansible_facts.os_family == 'Debian' else 'rpm' }}"
+    package_path: "{{ cw_linux_download_dir }}/amazon-cloudwatch-agent.{{ package_extension }}"
+    package_url: >-
+      {{ cw_download_base_url }}/{{ cw_linux_distributions[ansible_facts.distribution] }}/{{ cw_linux_architectures[ansible_facts.architecture] }}/latest/amazon-cloudwatch-agent.{{ package_extension }}
+  block:
+    - name: Install the signature verification tool
+      ansible.builtin.package:
+        name: "{{ 'gnupg' if ansible_facts.os_family == 'Debian' else 'gnupg2' }}"
+        state: present
+
+    - name: Create a private directory for the installer and signing key
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: root
+        group: root
+        mode: '0700'
+      loop:
+        - "{{ cw_linux_download_dir }}"
+        - "{{ cw_linux_download_dir }}/keyring"
+
+    - name: Download the agent package, detached signature and AWS public key
+      ansible.builtin.get_url:
+        url: "{{ item.url }}"
+        dest: "{{ item.dest }}"
+        mode: '0600'
+        force: true
+      loop:
+        - url: "{{ package_url }}"
+          dest: "{{ package_path }}"
+        - url: "{{ package_url }}.sig"
+          dest: "{{ package_path }}.sig"
+        - url: "{{ cw_signing_key_url }}"
+          dest: "{{ cw_linux_download_dir }}/amazon-cloudwatch-agent.gpg"
+      loop_control:
+        label: "{{ item.dest }}"
+
+    - name: Import the AWS key into the private verification keyring
+      ansible.builtin.command:
+        argv:
+          - gpg
+          - --batch
+          - --homedir
+          - "{{ cw_linux_download_dir }}/keyring"
+          - --import
+          - "{{ cw_linux_download_dir }}/amazon-cloudwatch-agent.gpg"
+      changed_when: false
+
+    # VALIDSIG checks both package integrity and the documented AWS signing key.
+    - name: Verify the detached signature and trusted key fingerprint
+      ansible.builtin.command:
+        argv:
+          - gpg
+          - --batch
+          - --homedir
+          - "{{ cw_linux_download_dir }}/keyring"
+          - --status-fd
+          - '1'
+          - --verify
+          - "{{ package_path }}.sig"
+          - "{{ package_path }}"
+      register: package_signature
+      changed_when: false
+      failed_when: >-
+        package_signature.rc != 0 or
+        ('[GNUPG:] VALIDSIG ' ~ cw_signing_key_fingerprint ~ ' ') not in package_signature.stdout
+
+    - name: Install the verified RPM package
+      ansible.builtin.command:
+        argv:
+          - rpm
+          - -U
+          - "{{ package_path }}"
+        creates: "{{ cw_linux_ctl_path }}"
+      when: ansible_facts.os_family == 'RedHat'
+      notify: Apply Linux CloudWatch configuration
+
+    - name: Install the verified Debian package
+      ansible.builtin.apt:
+        deb: "{{ package_path }}"
+        state: present
+      when: ansible_facts.os_family == 'Debian'
+      notify: Apply Linux CloudWatch configuration
+
+- name: Create the Linux agent configuration directory
+  ansible.builtin.file:
+    path: /opt/aws/amazon-cloudwatch-agent/etc
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Write the Linux disk metrics configuration
+  ansible.builtin.template:
+    src: amazon-cloudwatch-agent-linux.json.j2
+    dest: "{{ cw_config_linux_path }}"
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Apply Linux CloudWatch configuration
+
+- name: Apply pending agent configuration before checking the service
+  ansible.builtin.meta: flush_handlers
+
+- name: Keep the Linux agent running across reboots
+  ansible.builtin.systemd_service:
+    name: "{{ cw_service_linux }}"
+    state: started
+    enabled: true
+  when: not ansible_check_mode or cw_linux_installed.stat.exists

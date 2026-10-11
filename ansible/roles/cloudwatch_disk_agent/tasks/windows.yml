@@ -1,0 +1,68 @@
+---
+- name: Require a 64-bit Windows installation
+  ansible.builtin.assert:
+    that:
+      - ansible_facts.os_family == 'Windows'
+      - ansible_facts.architecture == '64-bit'
+    fail_msg: The Windows package supports 64-bit Windows Server only.
+
+- name: Check whether the Windows agent is already installed
+  ansible.windows.win_stat:
+    path: "{{ cw_windows_ctl_path }}"
+  register: cw_windows_installed
+
+- name: Install a verified Windows agent when absent
+  when:
+    - not cw_windows_installed.stat.exists
+    - not ansible_check_mode
+  block:
+    - name: Download the Windows installer
+      ansible.windows.win_get_url:
+        url: "{{ cw_agent_windows_msi_url }}"
+        dest: "{{ cw_windows_installer_path }}"
+        force: true
+
+    - name: Verify the Windows installer signature and publisher
+      ansible.windows.win_powershell:
+        script: |
+          param([string]$InstallerPath)
+          $Ansible.Changed = $false
+          $signature = Get-AuthenticodeSignature -LiteralPath $InstallerPath
+          if ($signature.Status -ne 'Valid') {
+              throw "The CloudWatch installer signature is not valid: $($signature.Status)"
+          }
+          $publisher = $signature.SignerCertificate.GetNameInfo(
+              [System.Security.Cryptography.X509Certificates.X509NameType]::SimpleName, $false)
+          if ($publisher -ne 'Amazon Web Services, Inc.') {
+              throw "The CloudWatch installer has an unexpected publisher: $publisher"
+          }
+        parameters:
+          InstallerPath: "{{ cw_windows_installer_path }}"
+        error_action: stop
+
+    - name: Install the verified Windows package
+      ansible.windows.win_package:
+        path: "{{ cw_windows_installer_path }}"
+        state: present
+      notify: Apply Windows CloudWatch configuration
+
+- name: Create the Windows agent configuration directory
+  ansible.windows.win_file:
+    path: 'C:\ProgramData\Amazon\AmazonCloudWatchAgent'
+    state: directory
+
+- name: Write the Windows disk metrics configuration
+  ansible.windows.win_template:
+    src: amazon-cloudwatch-agent-windows.json.j2
+    dest: "{{ cw_config_windows_path }}"
+  notify: Apply Windows CloudWatch configuration
+
+- name: Apply pending agent configuration before checking the service
+  ansible.builtin.meta: flush_handlers
+
+- name: Keep the Windows agent running across reboots
+  ansible.windows.win_service:
+    name: "{{ cw_service_windows }}"
+    state: started
+    start_mode: auto
+  when: not ansible_check_mode or cw_windows_installed.stat.exists

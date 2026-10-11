@@ -1,0 +1,65 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Regional OAM metric link and Ansible SSM staging bucket. Deploy in each member account and region.
+
+Parameters:
+  CentralSinkArn:
+    Type: String
+    Description: Central OAM sink ARN from the same region as this stack.
+
+Resources:
+  MemberObservabilityLink:
+    Type: AWS::Oam::Link
+    Properties:
+      LabelTemplate: '$AccountName'
+      ResourceTypes:
+        - AWS::CloudWatch::Metric
+      SinkIdentifier: !Ref CentralSinkArn
+      LinkConfiguration:
+        MetricConfiguration:
+          Filter: "Namespace = 'CWAgent'"
+
+  AnsibleSSMStagingBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub 'ansible-ssm-staging-${AWS::AccountId}-${AWS::Region}'
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      LifecycleConfiguration:
+        Rules:
+          - Id: RemoveAbandonedModuleTransfers
+            Status: Enabled
+            ExpirationInDays: 1
+
+  StagingBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref AnsibleSSMStagingBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: RequireTLS
+            Effect: Deny
+            Principal: '*'
+            Action: s3:*
+            Resource:
+              - !GetAtt AnsibleSSMStagingBucket.Arn
+              - !Sub '${AnsibleSSMStagingBucket.Arn}/*'
+            Condition:
+              Bool:
+                aws:SecureTransport: 'false'
+
+Outputs:
+  LinkArn:
+    Description: Metric-sharing link to the central account in this region.
+    Value: !GetAtt MemberObservabilityLink.Arn
+
+  StagingBucketName:
+    Description: Use as ansible_aws_ssm_bucket_name for instances in this account and region.
+    Value: !Ref AnsibleSSMStagingBucket

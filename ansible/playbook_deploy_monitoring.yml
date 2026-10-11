@@ -1,0 +1,28 @@
+---
+- name: Configure Linux disk monitoring
+  hosts: linux_instances
+  gather_facts: true
+  become: true
+  serial: 25
+  vars_files:
+    - inventory/group_vars/all.yml
+  vars:
+    monitoring_platform: linux
+    ansible_shell_type: sh
+    ansible_aws_ssm_profile: "{{ target_profile }}"
+  roles:
+    - cloudwatch_disk_agent
+
+- name: Configure Windows disk monitoring
+  hosts: windows_instances
+  gather_facts: true
+  become: false
+  serial: 25
+  vars_files:
+    - inventory/group_vars/all.yml
+  vars:
+    monitoring_platform: windows
+    ansible_shell_type: powershell
+    ansible_aws_ssm_profile: "{{ target_profile }}"
+  roles:
+    - cloudwatch_disk_agent

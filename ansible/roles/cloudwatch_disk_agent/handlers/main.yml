@@ -1,0 +1,28 @@
+---
+- name: Apply Linux CloudWatch configuration
+  ansible.builtin.command:
+    argv:
+      - "{{ cw_linux_ctl_path }}"
+      - -a
+      - fetch-config
+      - -m
+      - ec2
+      - -s
+      - -c
+      - "file:{{ cw_config_linux_path }}"
+  changed_when: true
+  when: not ansible_check_mode
+
+- name: Apply Windows CloudWatch configuration
+  ansible.windows.win_powershell:
+    script: |
+      param([string]$ControlScript, [string]$ConfigPath)
+      & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $ControlScript -a fetch-config -m ec2 -s -c "file:$ConfigPath"
+      if ($LASTEXITCODE -ne 0) {
+          throw "CloudWatch configuration failed with exit code $LASTEXITCODE"
+      }
+    parameters:
+      ControlScript: "{{ cw_windows_ctl_path }}"
+      ConfigPath: "{{ cw_config_windows_path }}"
+    error_action: stop
+  when: not ansible_check_mode

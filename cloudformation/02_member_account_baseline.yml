@@ -1,0 +1,110 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Account-wide monitoring IAM roles and instance profile. Deploy once per member account.
+
+Parameters:
+  CentralControllerRoleArn:
+    Type: String
+    Description: Existing Ansible controller role permitted to assume the execution role.
+    AllowedPattern: '^arn:[a-z0-9-]+:iam::[0-9]{12}:role/.+$'
+
+Resources:
+  # For VMs with an existing application role, add these policies to that role instead.
+  EC2MonitoringInstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: EC2CloudWatchAndSSMMonitoringRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub 'arn:${AWS::Partition}:iam::aws:policy/AmazonSSMManagedInstanceCore'
+        - !Sub 'arn:${AWS::Partition}:iam::aws:policy/CloudWatchAgentServerPolicy'
+
+  EC2MonitoringInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      InstanceProfileName: EC2CloudWatchAndSSMMonitoringProfile
+      Roles:
+        - !Ref EC2MonitoringInstanceRole
+
+  AnsibleCrossAccountExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: AnsibleCrossAccountExecutionRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: !Ref CentralControllerRoleArn
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: DiskMonitoringExecution
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: DiscoverInstancesAndMetrics
+                Effect: Allow
+                Action:
+                  - ec2:DescribeInstances
+                  - ec2:DescribeTags
+                  - ssm:DescribeInstanceInformation
+                  - cloudwatch:ListMetrics
+                  - cloudwatch:GetMetricData
+                  - cloudwatch:DescribeAlarms
+                Resource: '*'
+              - Sid: ConfigureDiskAlarms
+                Effect: Allow
+                Action:
+                  - cloudwatch:PutMetricAlarm
+                  - cloudwatch:EnableAlarmActions
+                Resource: !Sub 'arn:${AWS::Partition}:cloudwatch:*:${AWS::AccountId}:alarm:Disk-*'
+              - Sid: StartShellSessions
+                Effect: Allow
+                Action: ssm:StartSession
+                Resource:
+                  - !Sub 'arn:${AWS::Partition}:ec2:*:${AWS::AccountId}:instance/*'
+                  - !Sub 'arn:${AWS::Partition}:ssm:*:${AWS::AccountId}:document/SSM-SessionManagerRunShell'
+              # This API does not support resource-level permissions.
+              - Sid: OpenSessionDataChannel
+                Effect: Allow
+                Action: ssmmessages:OpenDataChannel
+                Resource: '*'
+              - Sid: EndOwnSessions
+                Effect: Allow
+                Action: ssm:TerminateSession
+                Resource: !Sub 'arn:${AWS::Partition}:ssm:*:${AWS::AccountId}:session/*'
+                Condition:
+                  StringLike:
+                    ssm:resourceTag/aws:ssmmessages:session-id: '${aws:userid}*'
+              # The connection plugin signs S3 transfers; VMs need no S3 IAM policy.
+              - Sid: LocateStagingBuckets
+                Effect: Allow
+                Action:
+                  - s3:ListBucket
+                  - s3:GetBucketLocation
+                Resource: !Sub 'arn:${AWS::Partition}:s3:::ansible-ssm-staging-${AWS::AccountId}-*'
+              - Sid: TransferAndRemoveModules
+                Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:DeleteObject
+                Resource: !Sub 'arn:${AWS::Partition}:s3:::ansible-ssm-staging-${AWS::AccountId}-*/*'
+
+Outputs:
+  ExecutionRoleArn:
+    Description: Role assumed by the Ansible controller for discovery, deployment, and coverage checks.
+    Value: !GetAtt AnsibleCrossAccountExecutionRole.Arn
+
+  InstanceProfileName:
+    Description: Attach to VMs without an application instance profile; never replace an existing role blindly.
+    Value: !Ref EC2MonitoringInstanceProfile
+
+  InstanceRoleArn:
+    Description: EC2 role carrying SSM and CloudWatch Agent permissions.
+    Value: !GetAtt EC2MonitoringInstanceRole.Arn

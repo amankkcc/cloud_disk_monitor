@@ -1,0 +1,22 @@
+---
+- name: Discover disks and record the expected monitoring coverage
+  ansible.builtin.include_tasks: discover.yml
+
+- name: Install and configure the Linux agent
+  ansible.builtin.include_tasks: linux.yml
+  when: monitoring_platform == 'linux'
+
+- name: Install and configure the Windows agent
+  ansible.builtin.include_tasks: windows.yml
+  when: monitoring_platform == 'windows'
+
+- name: Create disk capacity alarms
+  ansible.builtin.include_tasks:
+    file: alarms.yml
+    apply:
+      delegate_to: localhost
+      connection: local
+      become: false
+  vars:
+    ansible_shell_type: sh
+    ansible_python_interpreter: "{{ ansible_playbook_python }}"

@@ -1,0 +1,50 @@
+---
+- name: Select mounted persistent Linux filesystems
+  ansible.builtin.set_fact:
+    monitoring_filesystems: >-
+      {{ ansible_facts.mounts
+         | rejectattr('fstype', 'in', linux_ignored_filesystems)
+         | map(attribute='mount') | unique | sort }}
+  when: monitoring_platform == 'linux'
+
+- name: Discover fixed Windows logical drives
+  ansible.windows.win_powershell:
+    script: |
+      [CmdletBinding(SupportsShouldProcess)]
+      param()
+      $Ansible.Changed = $false
+      Get-CimInstance Win32_LogicalDisk -Filter 'DriveType = 3' |
+          Select-Object -ExpandProperty DeviceID |
+          Sort-Object -Unique
+    error_action: stop
+  register: windows_drives
+  when: monitoring_platform == 'windows'
+
+- name: Save the discovered Windows drive names
+  ansible.builtin.set_fact:
+    monitoring_filesystems: "{{ windows_drives.output }}"
+  when: monitoring_platform == 'windows'
+
+- name: Require at least one discovered filesystem
+  ansible.builtin.assert:
+    that:
+      - monitoring_filesystems | length > 0
+    fail_msg: No persistent filesystems were discovered; monitoring cannot be marked complete.
+
+# Save expectations before installation so an installation failure remains visible.
+- name: Record the discovered filesystem inventory on the controller
+  ansible.builtin.copy:
+    dest: "{{ monitoring_state_dir }}/{{ inventory_hostname }}.json"
+    content: "{{ coverage_manifest | to_nice_json }}\n"
+    mode: '0600'
+  vars:
+    ansible_shell_type: sh
+    ansible_python_interpreter: "{{ ansible_playbook_python }}"
+    coverage_manifest:
+      instance_id: "{{ inventory_hostname }}"
+      platform: "{{ monitoring_platform }}"
+      collected_at: "{{ lookup('ansible.builtin.pipe', 'date -u +%Y-%m-%dT%H:%M:%SZ') }}"
+      filesystems: "{{ monitoring_filesystems }}"
+  delegate_to: localhost
+  connection: local
+  become: false

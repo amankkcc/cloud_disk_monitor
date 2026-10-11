@@ -1,0 +1,24 @@
+---
+cw_download_base_url: https://amazoncloudwatch-agent.s3.amazonaws.com
+cw_signing_key_url: "{{ cw_download_base_url }}/assets/amazon-cloudwatch-agent.gpg"
+cw_signing_key_fingerprint: 937616F3450B7D806CBD9725D58167303B789C72
+
+cw_linux_distributions:
+  Amazon: amazon_linux
+  RedHat: redhat
+  Ubuntu: ubuntu
+  Debian: debian
+cw_linux_architectures:
+  x86_64: amd64
+  aarch64: arm64
+
+cw_linux_ctl_path: /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl
+cw_config_linux_path: /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json
+cw_service_linux: amazon-cloudwatch-agent
+cw_linux_download_dir: /var/tmp/cloudwatch-agent-install
+
+cw_agent_windows_msi_url: "{{ cw_download_base_url }}/windows/amd64/latest/amazon-cloudwatch-agent.msi"
+cw_windows_installer_path: 'C:\Windows\Temp\amazon-cloudwatch-agent.msi'
+cw_windows_ctl_path: 'C:\Program Files\Amazon\AmazonCloudWatchAgent\amazon-cloudwatch-agent-ctl.ps1'
+cw_config_windows_path: 'C:\ProgramData\Amazon\AmazonCloudWatchAgent\amazon-cloudwatch-agent.json'
+cw_service_windows: AmazonCloudWatchAgent

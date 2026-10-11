@@ -1,0 +1,8 @@
+__pycache__/
+*.py[cod]
+.venv/
+.venv-linux/
+.tools/
+.monitoring-state/
+.aws/
+.env
